@@ -64,7 +64,10 @@ public class TangoJNINative {
   // Set texture method.
   public static native void setTextureMethod();
   
-//Connect the onCameraFrame callback.
- public static native int connectCameraCallbacks();
+  // Connect the onCameraFrame callback.
+  public static native int connectCameraCallbacks();
+  
+  // Load binary file containing target model
+  public static native int loadTargetModel(String path);
 
 }

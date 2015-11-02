@@ -24,8 +24,10 @@
 
 #include <tango_client_api.h>  // NOLINT
 #include <tango-gl/util.h>
-#include "yuv_drawable.h"
 #include <tango-gl/video_overlay.h>
+#include "param.h"
+#include "yuv_drawable.h"
+#include "frame_processor.h"
 
 namespace tango_video_overlay {
 
@@ -79,6 +81,9 @@ class VideoOverlayApp {
     current_texture_method_ = static_cast<TextureMethod>(method);
   }
 
+  // Load visual features from the binary file
+  int LoadTargetModel(JNIEnv* env, jstring path);
+
  private:
   // Tango configration file, this object is for configuring Tango Service setup
   // before connect to service. For example, we set the flag
@@ -88,6 +93,9 @@ class VideoOverlayApp {
   // video_overlay_ render the camera video feedback onto the screen.
   tango_gl::VideoOverlay* video_overlay_drawable_;
   YUVDrawable* yuv_drawable_;
+
+  // processor_ processes the input frame
+  frameProcessor* processor_;
 
   TextureMethod current_texture_method_;
 

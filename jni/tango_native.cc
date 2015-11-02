@@ -26,62 +26,69 @@ extern "C" {
 #endif
 JNIEXPORT jint JNICALL
 Java_com_project_tango_TangoJNINative_initialize(
-    JNIEnv* env, jobject, jobject activity) {
-  return app.TangoInitialize(env, activity);
+		JNIEnv* env, jobject, jobject activity) {
+	return app.TangoInitialize(env, activity);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_project_tango_TangoJNINative_setupConfig(
-    JNIEnv*, jobject) {
-  return app.TangoSetupConfig();
+		JNIEnv*, jobject) {
+	return app.TangoSetupConfig();
 }
 
 JNIEXPORT jint JNICALL
 Java_com_project_tango_TangoJNINative_connect(
-    JNIEnv*, jobject) {
-  return app.TangoConnect();
+		JNIEnv*, jobject) {
+	return app.TangoConnect();
 }
 
 JNIEXPORT void JNICALL
 Java_com_project_tango_TangoJNINative_disconnect(
-    JNIEnv*, jobject) {
-  app.TangoDisconnect();
+		JNIEnv*, jobject) {
+	app.TangoDisconnect();
 }
 
 JNIEXPORT void JNICALL
 Java_com_project_tango_TangoJNINative_initGlContent(
-    JNIEnv*, jobject) {
-  app.InitializeGLContent();
+		JNIEnv*, jobject) {
+	app.InitializeGLContent();
 }
 
 JNIEXPORT void JNICALL
 Java_com_project_tango_TangoJNINative_setupGraphic(
-    JNIEnv*, jobject, jint width, jint height) {
-  app.SetViewPort(width, height);
+		JNIEnv*, jobject, jint width, jint height) {
+	app.SetViewPort(width, height);
 }
 
 JNIEXPORT void JNICALL
 Java_com_project_tango_TangoJNINative_render(
-    JNIEnv*, jobject) {
-  app.Render();
+		JNIEnv*, jobject) {
+	app.Render();
 }
 
 JNIEXPORT void JNICALL
 Java_com_project_tango_TangoJNINative_freeGLContent(
-    JNIEnv*, jobject) {
-  app.FreeGLContent();
+		JNIEnv*, jobject) {
+	app.FreeGLContent();
 }
 
 JNIEXPORT void JNICALL
 Java_com_project_tango_TangoJNINative_setYUVMethod(
-    JNIEnv*, jobject) {
-  app.SetTextureMethod(0);
+		JNIEnv*, jobject) {
+	app.SetTextureMethod(0);
 }
 
 JNIEXPORT void JNICALL
 Java_com_project_tango_TangoJNINative_setTextureMethod(
-    JNIEnv*, jobject) {
-  app.SetTextureMethod(1);
+		JNIEnv*, jobject) {
+	app.SetTextureMethod(1);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_project_tango_TangoJNINative_loadTargetModel(
+		JNIEnv* env, jobject, jstring path) {
+	return app.LoadTargetModel(env, path);
+
 }
 
 #ifdef __cplusplus

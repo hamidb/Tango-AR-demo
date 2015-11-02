@@ -29,6 +29,8 @@ LOCAL_CFLAGS    := -Werror -std=c++11
 LOCAL_SRC_FILES := tango_native.cc \
                    tango_handler.cc \
                    yuv_drawable.cc \
+                   frame_processor.cc \
+                   rhorefc.cc \
                    $(TANGO_ROOT)/tango-gl/camera.cpp \
                    $(TANGO_ROOT)/tango-gl/line.cpp \
                    $(TANGO_ROOT)/tango-gl/util.cpp \

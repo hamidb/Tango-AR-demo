@@ -27,6 +27,7 @@ long long currentTimeInMilliseconds()
 }
 
 namespace {
+
 void OnFrameAvailableRouter(void* context, TangoCameraId,
 		const TangoImageBuffer* buffer) {
 	using namespace tango_video_overlay;
@@ -161,6 +162,7 @@ void VideoOverlayApp::TangoDisconnect() {
 void VideoOverlayApp::InitializeGLContent() {
 	video_overlay_drawable_ = new tango_gl::VideoOverlay();
 	yuv_drawable_ = new YUVDrawable();
+	processor_ = new frameProcessor();
 
 	// Connect color camera texture. TangoService_connectTextureId expects a valid
 	// texture id from the caller, so we will need to wait until the GL content is
@@ -230,9 +232,11 @@ void VideoOverlayApp::RenderYUV() {
 	}
 
 	cv::Mat src = cv::Mat(yuv_height_*3/2,yuv_width_,CV_8U, &yuv_buffer_[0]);
-	cv::Mat dst = cv::Mat::zeros(yuv_height_,yuv_width_,CV_8UC3);
+	cv::Mat dst = cv::Mat(yuv_height_,yuv_width_,CV_8UC3);
 
 	cv::cvtColor(src,dst, CV_YUV2RGB_NV21);
+	processor_->processFrame(dst, dst);
+
 #if 0
 	for (size_t i = 0; i < yuv_height_; ++i) {
 		for (size_t j = 0; j < yuv_width_; ++j) {
@@ -269,12 +273,22 @@ void VideoOverlayApp::RenderTextureId() {
 	// texture and timestamp.
 	int ret = TangoService_updateTexture(TANGO_CAMERA_COLOR, &timestamp);
 	if (ret != TANGO_SUCCESS) {
-		LOGE(
-				"VideoOverlayApp: Failed to update the texture id with error code: "
-				"%d",
-				ret);
+		LOGE("VideoOverlayApp: Failed to update the texture id with error code: "
+			"%d", ret);
 	}
 	video_overlay_drawable_->Render(glm::mat4(1.0f), glm::mat4(1.0f));
 }
 
+int VideoOverlayApp::LoadTargetModel(JNIEnv* env, jstring path) {
+	  const char* path_ = (const char*) env->GetStringUTFChars(path,NULL);
+
+	  int ret = RET_SUCCESS;
+//	  if(1!mad.readModelFromFile(path_)){
+//		  ret = RET_FAILED;
+//	  }
+	  env->ReleaseStringUTFChars(path,path_);
+	  return ret;
 }
+
+}
+

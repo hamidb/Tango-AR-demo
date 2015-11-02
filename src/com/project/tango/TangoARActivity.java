@@ -19,20 +19,24 @@ package com.project.tango;
 import com.project.tango.R;
 
 import android.app.Activity;
+import android.content.ContextWrapper;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.Toast;
 import android.widget.ToggleButton;
 import android.util.Log;
 import android.util.Log;
 // Main activity
 public class TangoARActivity extends Activity
     implements View.OnClickListener {
+	
   public enum TextureMethod {
     YUV,
     TEXTURE_ID
   }
 
+  private static final String TAG = "TangoAR-java";
   private GLSurfaceView glView;
   private ToggleButton mYUVRenderSwitcher;
 
@@ -63,7 +67,14 @@ public class TangoARActivity extends Activity
     // Connect to Tango Service.
     // This function will start the Tango Service pipeline, in this case,
     // it will start Motion Tracking.
-    TangoJNINative.connect();
+    TangoJNINative.connect();    
+	
+    // Load binary model containing visual description of the target.
+    if(loadBinaryModel() != 1){
+    		Log.i(TAG, "Unable to load model file \n");
+    		Toast.makeText(getBaseContext(),
+    				"Unable to load model!", Toast.LENGTH_SHORT).show();
+    }
 
     EnableYUVTexture(mYUVRenderSwitcher.isChecked());
   }
@@ -99,5 +110,11 @@ public class TangoARActivity extends Activity
       } else {
         TangoJNINative.setTextureMethod();
       }
+  }
+  
+  private int loadBinaryModel(){
+		ContextWrapper cw = new ContextWrapper(getBaseContext());
+		String path = cw.getFilesDir().getAbsolutePath();		
+		return TangoJNINative.loadTargetModel(path+"/model.bin");
   }
 }
