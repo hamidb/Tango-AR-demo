@@ -16,17 +16,24 @@
 
 package com.project.tango;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
 import com.project.tango.R;
 
 import android.app.Activity;
 import android.content.ContextWrapper;
+import android.content.res.AssetManager;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 import android.util.Log;
-import android.util.Log;
+
 // Main activity
 public class TangoARActivity extends Activity
     implements View.OnClickListener {
@@ -36,7 +43,10 @@ public class TangoARActivity extends Activity
     TEXTURE_ID
   }
 
-  private static final String TAG = "TangoAR-java";
+  private static final int RET_SUCCESS 			= 0;
+  private static final int RET_FAILED 			= -1;
+  private static final String TAG 				= "TangoAR-java";
+  private static final String mModelFilename 	= "model.bin";
   private GLSurfaceView glView;
   private ToggleButton mYUVRenderSwitcher;
 
@@ -51,6 +61,18 @@ public class TangoARActivity extends Activity
     mYUVRenderSwitcher = (ToggleButton) findViewById(R.id.yuv_switcher);
     mYUVRenderSwitcher.setOnClickListener(this);
 
+    // Copy model binary file from asset to sd card so that 
+    // the native side can read it.
+    ContextWrapper pContextW  = new ContextWrapper(this);
+	String path = pContextW.getFilesDir().getAbsolutePath();
+	File MDLData = new File(path + mModelFilename);
+	if(MDLData.exists()){
+		Log.e(TAG, "Model file is not in the assets!\n");
+	}
+	else{
+		copyAssets(path);
+	}
+	
     // Initialize Tango Service, this function starts the communication
     // between the application and Tango Service.
     // The activity object is used for checking if the API version is outdated.
@@ -70,12 +92,15 @@ public class TangoARActivity extends Activity
     TangoJNINative.connect();    
 	
     // Load binary model containing visual description of the target.
-    if(loadBinaryModel() != 1){
+    if(loadBinaryModel() != RET_SUCCESS){
     		Log.i(TAG, "Unable to load model file \n");
     		Toast.makeText(getBaseContext(),
     				"Unable to load model!", Toast.LENGTH_SHORT).show();
+    }else{
+    	Toast.makeText(getBaseContext(),
+    			"Model loaded ...", Toast.LENGTH_SHORT).show();
     }
-
+    
     EnableYUVTexture(mYUVRenderSwitcher.isChecked());
   }
 
@@ -83,6 +108,7 @@ public class TangoARActivity extends Activity
   protected void onPause() {
     super.onPause();
     glView.onPause();
+    
     // Disconnect from Tango Service, release all the resources that the app is
     // holding from Tango Service.
     TangoJNINative.disconnect();
@@ -111,10 +137,54 @@ public class TangoARActivity extends Activity
         TangoJNINative.setTextureMethod();
       }
   }
-  
+
   private int loadBinaryModel(){
 		ContextWrapper cw = new ContextWrapper(getBaseContext());
 		String path = cw.getFilesDir().getAbsolutePath();		
-		return TangoJNINative.loadTargetModel(path+"/model.bin");
+		return TangoJNINative.loadTargetModel(path + "/" + mModelFilename);
+  }
+  
+  private void copyAssets(String outputPath) {
+	  AssetManager assetManager = getAssets();
+	  String[] files = null;
+	  try {
+		  files = assetManager.list("");
+	  }
+	  catch (IOException e) {
+		  Log.e("TAG", "Failed to get asset file list.", e);
+	  }
+
+	  for(String filename : files) {
+		  if( filename.equals(mModelFilename) )
+		  {
+			  InputStream inStream = null;
+			  OutputStream outStream = null;
+
+			  try {
+				  inStream = assetManager.open(filename);
+				  String out= outputPath +"/" +filename ; 
+
+				  File outFile = new File(out);
+				  outStream = new FileOutputStream(outFile);
+
+				  copyFile(inStream, outStream);
+				  inStream.close();
+				  inStream = null;
+				  outStream.flush();
+				  outStream.close();
+				  outStream = null;
+			  }
+			  catch(IOException e) {
+				  Log.e(TAG, "Failed to copy asset file: " + filename, e);
+			  }
+		  }
+	  }
+  }
+  private void copyFile(InputStream in, OutputStream out) throws IOException {
+	  byte[] buffer = new byte[1024];
+	  int read;
+	  while((read = in.read(buffer)) != -1){
+		  out.write(buffer, 0, read);
+	  }
   }
 }

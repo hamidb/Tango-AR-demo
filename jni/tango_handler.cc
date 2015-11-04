@@ -16,11 +16,14 @@
 
 #include "tango-video-handler/tango_handler.h"
 #include <sys/time.h>
+#include <string>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-long long currentTimeInMilliseconds()
-{
+// processor_ processes the input frame
+static frameProcessor processor_;
+
+long long currentTimeInMilliseconds() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
@@ -162,7 +165,6 @@ void VideoOverlayApp::TangoDisconnect() {
 void VideoOverlayApp::InitializeGLContent() {
 	video_overlay_drawable_ = new tango_gl::VideoOverlay();
 	yuv_drawable_ = new YUVDrawable();
-	processor_ = new frameProcessor();
 
 	// Connect color camera texture. TangoService_connectTextureId expects a valid
 	// texture id from the caller, so we will need to wait until the GL content is
@@ -235,7 +237,7 @@ void VideoOverlayApp::RenderYUV() {
 	cv::Mat dst = cv::Mat(yuv_height_,yuv_width_,CV_8UC3);
 
 	cv::cvtColor(src,dst, CV_YUV2RGB_NV21);
-	processor_->processFrame(dst, dst);
+	processor_.processFrame(dst, dst);
 
 #if 0
 	for (size_t i = 0; i < yuv_height_; ++i) {
@@ -280,12 +282,10 @@ void VideoOverlayApp::RenderTextureId() {
 }
 
 int VideoOverlayApp::LoadTargetModel(JNIEnv* env, jstring path) {
-	  const char* path_ = (const char*) env->GetStringUTFChars(path,NULL);
 
-	  int ret = RET_SUCCESS;
-//	  if(1!mad.readModelFromFile(path_)){
-//		  ret = RET_FAILED;
-//	  }
+	  const char* path_ = (const char*) env->GetStringUTFChars(path,NULL);
+	  LOGE("VideoOverlayApp: before load %s", path_);
+	  int ret = processor_.loadModelFromFile(std::string(path_));
 	  env->ReleaseStringUTFChars(path,path_);
 	  return ret;
 }

@@ -11,6 +11,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
+#include <vector>
 #include "rhorefc.h"
 
 #define DESCRIPTOR_LENGTH 	256		// Length of BRIEF descriptor in bits
@@ -19,7 +20,7 @@
 #define FAST_THRSH			30		// FAST9 threshold (smaller -> more features)
 #define HALF_PATCH_WIDTH	15		// Half of 30 patch used in BRIEF
 #define MIN_HAMMING_DIST	46		// Hamming threshold used for matching
-
+using namespace cv;
 /* Data structure storing kernel members */
 struct KERNEL{
 
@@ -54,13 +55,29 @@ struct	d_match {
 * Struct for holding feature points
 */
 struct Feature {
-	uint32_t descriptor[DESCRIPTOR_SIZE];
+	uint32_t descriptor[8];
 	unsigned short x, y; 	// feature location
 	uint32_t index;			// feature index id
 
 	Feature(): index(0), x(0), y(0) {
 		memset(descriptor, 0, sizeof(descriptor));
 	}
+	Feature(const Feature& obj) : index(obj.index), x(obj.x), y(obj.y){
+		if(obj.descriptor != NULL)
+			memcpy(descriptor, obj.descriptor, sizeof(descriptor));
+	}
+	Feature& operator =(const Feature& obj){
+		x = obj.x;
+		y = obj.y;
+		index = obj.index;
+		if(obj.descriptor != NULL)
+			memcpy(descriptor, obj.descriptor, sizeof(descriptor));
+	}
+};
+struct Feature2 {
+	uint32_t descriptor[8];
+	unsigned short x, y; 	// feature location
+	uint32_t index;			// feature index id
 };
 
 class frameProcessor {
@@ -72,13 +89,16 @@ public:
 
 	// Main process loop
 	// Takes as input an RGB Mat
-	int processFrame(const cv::Mat& input, cv::Mat& output);
+	int processFrame(const cv::Mat&, cv::Mat&);
 
 	// Setup configuration parameters
 	int configProcessor(void);
 
 	// Release and clean memory
 	int releaseProcessor(void);
+
+	// Load features table from a binary file
+	int loadModelFromFile(const std::string&);
 
 private:
 	// Extract FAST9 features and BRIEF descriptor
@@ -94,17 +114,24 @@ private:
 	int estimateH(const std::vector<cv::Point2f>& srcPoints,
 				  const std::vector<cv::Point2f>& dstPoints) const;
 
-	std::vector<cv::Point2f> srcPoints;	// 2D feature points from query frame
-	std::vector<cv::Point2f> dstPoints; // 2D feature points from trained model
-protected:
-	/// Pairwise test location used in BRIEF descriptor
+	// 2D feature points from query frame
+	std::vector<cv::Point2f> srcPoints;
+
+	// 2D feature points from trained model
+	std::vector<cv::Point2f> dstPoints;
+
+	// Pairwise test location used in BRIEF descriptor
 	static const int8_t BRIEFLoc[256][4];
+protected:
+	// Look-up table to store model features and indices
+	std::vector<Feature> featureTable;
+	std::vector<uint32_t> indexTbl[8192];	// 2^(13bits)
 };
 
 static inline int int32BitCount(unsigned v) {
     // http://www-graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
-    v = v - ((v >> 1) & 0x55555555);							// temporary
-    v = (v & 0x33333333) + ((v >> 2) & 0x33333333);				// temp
+    v = v - ((v >> 1) & 0x55555555);
+    v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
     return (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;	// count
 }
 

@@ -83,7 +83,7 @@ void frameProcessor::findBRIEFMatches(vector<Feature>& features, int pyramid,
     	unsigned comp[DESCRIPTOR_SIZE];
 
     	// Index table corresponding to the current index
-    	vector<uint32_t> dstIdxTbl 	= indexTbl[features_i.index];
+    	vector<uint32_t> dstIdxTbl 	= indexTbl[feature_i.index];
 
 		/**
 		 * Scan the table and compare with "features <vector>"
@@ -92,7 +92,7 @@ void frameProcessor::findBRIEFMatches(vector<Feature>& features, int pyramid,
     	for (j = 0; j < dstIdxTbl.size(); j++ ){
 
     		// Get the index of featureTable pointing to the right location
-    		uint32_t tIdx 		= indexTbl[features_i.index][j];
+    		uint32_t tIdx 		= indexTbl[feature_i.index][j];
 			Feature& feature_t 	= featureTable[tIdx];
 
     		for (k = 0; k < DESCRIPTOR_SIZE; k++){
@@ -299,6 +299,52 @@ int frameProcessor::estimateH(const std::vector<cv::Point2f>& srcPoints,
     else{
     	return RET_FAILED;
     }
+}
+//this reads the model from binary file
+int frameProcessor::loadModelFromFile(const string& filename)
+{
+	FILE * dFile = fopen(filename.c_str(), "rb");
+	if(!dFile){
+		return RET_FAILED;
+	}
+	uint64_t len, actualRead, i;
+
+	//Read the image size
+	Size targetSize;
+	fread(&targetSize, 1, sizeof(Size), dFile);
+
+	//Read Features
+	fread(&len,8,1,dFile);								// Read length in bytes
+	int numFeatures = (int)len/ (int)sizeof(Feature);	// Number of features
+
+	featureTable.resize(numFeatures);
+
+	actualRead = fread(&featureTable[0], sizeof(Feature), numFeatures, dFile);
+
+	if(numFeatures != (int)actualRead){
+		LOG_E("Error: Could not read model completely! \n");
+		fclose(dFile);
+		return RET_FAILED;
+	}
+
+	//Read feature index table
+	for(i = 0; i < 8192; i++){	// 8192 = (2^13) 13-bits index
+
+		fread(&len, 8, 1, dFile);
+		len /= (int)sizeof(uint32_t);
+		indexTbl[i].resize((int)len);
+		if(len){
+			actualRead = fread(&indexTbl[i][0], sizeof(uint32_t), (int)len, dFile);
+			if((int)len != (int)actualRead){
+				LOG_E("Error: Could not read the feature LUT completely!\n");
+				fclose(dFile);
+				return RET_FAILED;
+			}
+		}
+	}
+
+	fclose(dFile);
+	return RET_SUCCESS;
 }
 
 const int8_t frameProcessor::BRIEFLoc[256][4] = {

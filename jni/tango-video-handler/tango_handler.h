@@ -94,9 +94,6 @@ class VideoOverlayApp {
   tango_gl::VideoOverlay* video_overlay_drawable_;
   YUVDrawable* yuv_drawable_;
 
-  // processor_ processes the input frame
-  frameProcessor* processor_;
-
   TextureMethod current_texture_method_;
 
   std::vector<uint8_t> yuv_buffer_;
