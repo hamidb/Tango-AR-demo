@@ -21,19 +21,6 @@
 #define HALF_PATCH_WIDTH	15		// Half of 30 patch used in BRIEF
 #define MIN_HAMMING_DIST	46		// Hamming threshold used for matching
 using namespace cv;
-/* Data structure storing kernel members */
-struct KERNEL{
-
-
-	cv::Mat*	    input;		// input image
-	short			pyramid;	// current pyramid level
-
-
-    /* Variables used by kernel only */
-
-	uint32_t*	    descriptor;		/* pointer to a memory to avoid stack allocation */
-
-};
 
 /**
 * Struct similar to OpenCV DMatch
@@ -55,7 +42,7 @@ struct	d_match {
 * Struct for holding feature points
 */
 struct Feature {
-	uint32_t descriptor[8];
+	uint32_t descriptor[DESCRIPTOR_SIZE];
 	unsigned short x, y; 	// feature location
 	uint32_t index;			// feature index id
 
@@ -73,11 +60,6 @@ struct Feature {
 		if(obj.descriptor != NULL)
 			memcpy(descriptor, obj.descriptor, sizeof(descriptor));
 	}
-};
-struct Feature2 {
-	uint32_t descriptor[8];
-	unsigned short x, y; 	// feature location
-	uint32_t index;			// feature index id
 };
 
 class frameProcessor {
@@ -112,7 +94,12 @@ private:
 	uint16_t calcHashIndex(const cv::Mat& input, const cv::Point& pt) const;
 
 	int estimateH(const std::vector<cv::Point2f>& srcPoints,
-				  const std::vector<cv::Point2f>& dstPoints) const;
+				  const std::vector<cv::Point2f>& dstPoints);
+
+	int drawTargetBox(cv::Mat& src, const cv::Scalar& color) const;
+
+	// 3x3 matrix of homography
+	cv::Mat homography;
 
 	// 2D feature points from query frame
 	std::vector<cv::Point2f> srcPoints;
@@ -122,10 +109,13 @@ private:
 
 	// Pairwise test location used in BRIEF descriptor
 	static const int8_t BRIEFLoc[256][4];
-protected:
+
 	// Look-up table to store model features and indices
 	std::vector<Feature> featureTable;
 	std::vector<uint32_t> indexTbl[8192];	// 2^(13bits)
+
+	// A Vector stroring four corners of the target image
+	vector<Point2f> trgCorners;
 };
 
 static inline int int32BitCount(unsigned v) {

@@ -21,11 +21,13 @@ int frameProcessor::processFrame(const Mat& input, Mat& output)
 	output = input.clone();
 	int status = RET_SUCCESS;
 
+	Mat gray;
+	cvtColor(input, gray, CV_RGB2GRAY);
 	vector<D_MATCH> matches;
 	vector<Mat> scales;
-	scales.push_back(input);
-	scales.push_back(Mat(input.rows/2, input.cols/2, CV_8UC1));
-	scales.push_back(Mat(input.rows/4, input.cols/4, CV_8UC1));
+	scales.push_back(gray);
+	scales.push_back(Mat(gray.rows/2, gray.cols/2, CV_8UC1));
+	scales.push_back(Mat(gray.rows/4, gray.cols/4, CV_8UC1));
 
 	/**
 	 * Pyramid down to the half- and quarter-scales of the frame.
@@ -41,6 +43,7 @@ int frameProcessor::processFrame(const Mat& input, Mat& output)
 		 * Extract features for the query pyramid level
 		 */
 		extractFeatures(scales[pyramid], rtFeature);
+		LOG_E("num features %d\n", rtFeature.size());
 
 		/**
 		 * Match extracted features against the target model
@@ -67,6 +70,13 @@ int frameProcessor::processFrame(const Mat& input, Mat& output)
 
 	status |= estimateH(dstSorted, srcSorted);
 
+	if(!status){
+
+		/**
+		 * Draw bounding rectangle around the target
+		 */
+		status |= drawTargetBox(output, CV_RGB(0, 0, 255));
+	}
 
 	return status;
 }
@@ -80,7 +90,7 @@ void frameProcessor::findBRIEFMatches(vector<Feature>& features, int pyramid,
     	Feature  feature_i	= features[i];
     	uint32_t minDistIdx = 0;	    	//Minimum distance index
     	int	 	 minDist    = 0x7FFFFFFF;   //Minimum distance set at maximum value
-    	unsigned comp[DESCRIPTOR_SIZE];
+    	uint32_t comp[DESCRIPTOR_SIZE];
 
     	// Index table corresponding to the current index
     	vector<uint32_t> dstIdxTbl 	= indexTbl[feature_i.index];
@@ -228,15 +238,12 @@ uint16_t frameProcessor::calcHashIndex(const Mat& input, const Point& pt) const
 * @return	return error code (0 if succeed).
 */
 int frameProcessor::estimateH(const std::vector<cv::Point2f>& srcPoints,
-		  	  	  	  	  	  const std::vector<cv::Point2f>& dstPoints) const
+		  	  	  	  	  	  const std::vector<cv::Point2f>& dstPoints)
 {
-	Mat homography; 		// Matrix of homography
-
-	if (dstPoints.size() < MIN_NUM_MATCHES ){
+	unsigned npoints = dstPoints.size();
+	if (npoints < MIN_NUM_MATCHES ){
 		return RET_FAILED;
 	}
-
-	unsigned npoints = dstPoints.size();
 
 	/**
 	 * Create temporary output matrix.
@@ -250,6 +257,7 @@ int frameProcessor::estimateH(const std::vector<cv::Point2f>& srcPoints,
 	 * This is where the math happens. A homography estimation context is
 	 * initialized, used, then finalized.
 	 */
+
 	RHO_HEST_REFC* p = rhoRefCInit();
 
 	if(p == NULL){
@@ -261,7 +269,9 @@ int frameProcessor::estimateH(const std::vector<cv::Point2f>& srcPoints,
 	 * findHomography(), but no clean way appears to exit to do so. The price
 	 * to pay is marginally more computational work than strictly needed.
 	 */
-	rhoRefCEnsureCapacity(p, npoints, (float)RANSAC_NR_BETA);
+	if(rhoRefCEnsureCapacity(p, npoints, (float)RANSAC_NR_BETA) != 1){
+		return RET_FAILED;
+	}
 
 	/**
 	 * The critical call. All parameters are heavily documented in rhorefc.h.
@@ -270,19 +280,19 @@ int frameProcessor::estimateH(const std::vector<cv::Point2f>& srcPoints,
 	 * internal, optimized Levenberg-Marquardt method) are enabled.
 	 */
 	int numInliers = rhoRefC(p,
-			(const float*)&srcPoints[0],
-			(const float*)&dstPoints[0],
-			NULL,
-			(unsigned)	npoints,
-			(float)		RANSAC_REPROJ_THRSH,
-			(unsigned)	RANSAC_MAX_ITER,
-			(unsigned)	RANSAC_MAX_ITER,
-			(double)	RANSAC_CONFIDENCE,
+			(const float*)	&srcPoints[0],
+			(const float*)	&dstPoints[0],
+			(char*)			NULL,
+			(unsigned)		npoints,
+			(float)			RANSAC_REPROJ_THRSH,
+			(unsigned)		RANSAC_MAX_ITER,
+			(unsigned)		RANSAC_MAX_ITER,
+			(double)		RANSAC_CONFIDENCE,
 			4U,
-			(double)	RANSAC_NR_BETA,
+			(double)		RANSAC_NR_BETA,
 			RHO_FLAG_ENABLE_NR | RHO_FLAG_ENABLE_FINAL_REFINEMENT,
 			NULL,
-			(float*)tmpH.data);
+			(float*)		tmpH.data);
 
 	/**
      * Cleanup.
@@ -300,6 +310,44 @@ int frameProcessor::estimateH(const std::vector<cv::Point2f>& srcPoints,
     	return RET_FAILED;
     }
 }
+
+/**
+* Draw a closed bounding region around the detected target
+* given the computed Homography. It also checks if the bounding
+* region is a convex polygon.
+*/
+int frameProcessor::drawTargetBox(Mat& src, const Scalar& color) const
+{
+	/**
+	 * Compute output contours.
+	 */
+	 vector<Point2f> outCorners;
+	 if(trgCorners.size() != 4){
+		 LOG_E("Error: The model target corners are not initialized!");
+		 return RET_FAILED;
+	 }
+
+	 cv::perspectiveTransform(trgCorners, outCorners, homography);
+
+	 /**
+	  * Draw located target to display.
+	  */
+
+	 if(outCorners.size() > 0 && isContourConvex(outCorners)){
+
+		 vector<vector<Point> > contours;
+		 vector<Point> contour;
+		 contour.push_back(Point((float)outCorners[0].x, (float)outCorners[0].y));
+		 contour.push_back(Point((float)outCorners[1].x, (float)outCorners[1].y));
+		 contour.push_back(Point((float)outCorners[2].x, (float)outCorners[2].y));
+		 contour.push_back(Point((float)outCorners[3].x, (float)outCorners[3].y));
+		 contours.push_back(contour);
+		 polylines(src, contours, true, color, 4);
+	 }
+
+	 return RET_SUCCESS;
+}
+
 //this reads the model from binary file
 int frameProcessor::loadModelFromFile(const string& filename)
 {
@@ -343,6 +391,11 @@ int frameProcessor::loadModelFromFile(const string& filename)
 		}
 	}
 
+	// Fill trgCorners with four corners of the model image
+	trgCorners.push_back(Point2f(0, targetSize.height));
+	trgCorners.push_back(Point2f(targetSize.width, targetSize.height));
+	trgCorners.push_back(Point2f(targetSize.width, 0));
+	trgCorners.push_back(Point2f(0, 0));
 	fclose(dFile);
 	return RET_SUCCESS;
 }

@@ -47,6 +47,7 @@
  */
 
 /* Includes */
+#include "tango-video-handler/param.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -599,7 +600,6 @@ unsigned RHO_HEST_REFC::rhoRefC(const float*   src,     /* Source points */
         verify();
     }
 
-
     /**
      * PROSAC Loop
      */
@@ -778,7 +778,6 @@ inline void   RHO_HEST_REFC::finiRun(void){
      * Else if an (external) mask was provided as argument, find the other
      * (the internal one) and free it.
      */
-
     if(arg.inl){
         if(arg.inl == best.inl){
             alfree(curr.inl);
@@ -841,7 +840,6 @@ inline int    RHO_HEST_REFC::hypothesize(void){
 inline int    RHO_HEST_REFC::verify(void){
     evaluateModelSPRT();
     updateSPRT();
-
     if(isBestModel()){
         saveBestModel();
 
@@ -855,7 +853,6 @@ inline int    RHO_HEST_REFC::verify(void){
             nStarOptimize();
         }
     }
-
     return 1;
 }
 
@@ -1318,7 +1315,7 @@ inline void   RHO_HEST_REFC::nStarOptimize(void){
             best_n      = test_n;
             bestNumInl  = testNumInl;
         }
-        testNumInl -= !!arg.inl[test_n-1];
+        testNumInl -= !!best.inl[test_n-1];
     }
 
     if(bestNumInl*ctrl.phMax > ctrl.phNumInl*best_n){
@@ -1363,7 +1360,9 @@ inline void   RHO_HEST_REFC::outputModel(void){
 
 inline void   RHO_HEST_REFC::outputZeroH(void){
     memset(arg.finalH, 0, HSIZE);
-    memset(arg.inl,    0, arg.N);
+    if(arg.inl){
+    	memset(arg.inl,    0, arg.N);
+    }
 }
 
 /**

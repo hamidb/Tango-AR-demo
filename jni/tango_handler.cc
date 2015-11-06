@@ -284,7 +284,6 @@ void VideoOverlayApp::RenderTextureId() {
 int VideoOverlayApp::LoadTargetModel(JNIEnv* env, jstring path) {
 
 	  const char* path_ = (const char*) env->GetStringUTFChars(path,NULL);
-	  LOGE("VideoOverlayApp: before load %s", path_);
 	  int ret = processor_.loadModelFromFile(std::string(path_));
 	  env->ReleaseStringUTFChars(path,path_);
 	  return ret;
