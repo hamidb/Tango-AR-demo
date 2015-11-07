@@ -16,7 +16,7 @@
 
 #define DESCRIPTOR_LENGTH 	256		// Length of BRIEF descriptor in bits
 #define DESCRIPTOR_SIZE		8		// Size of the descriptor (256/32 = 8)
-#define MAX_TOTAL_MATCH		150		// Maximum number of required matches
+#define MAX_TOTAL_MATCH		1000	// Maximum number of required matches
 #define FAST_THRSH			30		// FAST9 threshold (smaller -> more features)
 #define HALF_PATCH_WIDTH	15		// Half of 30 patch used in BRIEF
 #define MIN_HAMMING_DIST	46		// Hamming threshold used for matching
@@ -28,9 +28,9 @@ using namespace cv;
 */
 typedef struct	d_match  D_MATCH;
 struct	d_match {
-    int queryIdx; // query descriptor index
-    int trainIdx; // train descriptor index
-    int distance; // matching distance
+    uint32_t queryIdx; // query descriptor index
+    uint32_t trainIdx; // train descriptor index
+    uint16_t distance; // matching distance
 
     /* compare operator */
     bool operator < (const D_MATCH &m) const{
@@ -87,8 +87,7 @@ private:
 	void extractFeatures(const cv::Mat& gray, std::vector<Feature>& features) const;
 
 	// Match runtime features with the model features (local binary features)
-	void findBRIEFMatches(std::vector<Feature>& features, int pyramid,
-						  std::vector<D_MATCH>& matches);
+	void findBRIEFMatches(std::vector<Feature>& features, int pyramid);
 
 	// Calculate 13-bit index for using local patch
 	uint16_t calcHashIndex(const cv::Mat& input, const cv::Point& pt) const;
@@ -100,7 +99,7 @@ private:
 
 	// 3x3 matrix of homography
 	cv::Mat homography;
-
+	vector<D_MATCH> matches;
 	// 2D feature points from query frame
 	std::vector<cv::Point2f> srcPoints;
 

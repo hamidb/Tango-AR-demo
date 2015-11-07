@@ -1301,6 +1301,8 @@ static inline void   sacInitNonRand(double    beta,
  */
 
 inline void   RHO_HEST_REFC::nStarOptimize(void){
+
+	LOG_E("start\n");
     unsigned min_sample_length = 10*2; /*(N * INLIERS_RATIO) */
     unsigned best_n       = arg.N;
     unsigned test_n       = best_n;
@@ -1315,7 +1317,7 @@ inline void   RHO_HEST_REFC::nStarOptimize(void){
             best_n      = test_n;
             bestNumInl  = testNumInl;
         }
-        testNumInl -= !!best.inl[test_n-1];
+        testNumInl -= !!arg.inl[test_n-1];
     }
 
     if(bestNumInl*ctrl.phMax > ctrl.phNumInl*best_n){
@@ -1326,6 +1328,7 @@ inline void   RHO_HEST_REFC::nStarOptimize(void){
                                             SMPL_SIZE,
                                             arg.maxI);
     }
+    LOG_E("end\n");
 }
 
 /**
@@ -1360,9 +1363,8 @@ inline void   RHO_HEST_REFC::outputModel(void){
 
 inline void   RHO_HEST_REFC::outputZeroH(void){
     memset(arg.finalH, 0, HSIZE);
-    if(arg.inl){
-    	memset(arg.inl,    0, arg.N);
-    }
+    memset(arg.inl,    0, arg.N);
+
 }
 
 /**

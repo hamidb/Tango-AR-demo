@@ -23,7 +23,8 @@ int frameProcessor::processFrame(const Mat& input, Mat& output)
 
 	Mat gray;
 	cvtColor(input, gray, CV_RGB2GRAY);
-	vector<D_MATCH> matches;
+	//GaussianBlur(gray, gray, Size(3,3), 1, 1);
+
 	vector<Mat> scales;
 	scales.push_back(gray);
 	scales.push_back(Mat(gray.rows/2, gray.cols/2, CV_8UC1));
@@ -36,26 +37,26 @@ int frameProcessor::processFrame(const Mat& input, Mat& output)
 	resize(scales[1], scales[2], Size(), 0.5, 0.5, INTER_AREA);
 
 	int i, pyramid = 0;
-	for( ; pyramid < 2 && matches.size() <= MAX_TOTAL_MATCH; pyramid++){
+	for( ; pyramid < 3 && matches.size() <= MAX_TOTAL_MATCH; pyramid++){
 		vector<Feature> rtFeature;
 
 		/**
 		 * Extract features for the query pyramid level
 		 */
 		extractFeatures(scales[pyramid], rtFeature);
-		LOG_E("num features %d\n", rtFeature.size());
 
 		/**
 		 * Match extracted features against the target model
 		 */
-		findBRIEFMatches(rtFeature, pyramid, matches);
+		findBRIEFMatches(rtFeature, pyramid);
 	}
 
 	/**
-	 * Sort matches by Hamming distance (PROSAC config)
+	 * Sort matches by Hamming distance (PROSAC mode)
 	 */
 	vector<Point2f> srcSorted, dstSorted;
 	std::sort(matches.begin(), matches.end());
+
 	for(i = 0; i < matches.size(); i++){
 		srcSorted.push_back(srcPoints[matches[i].queryIdx]);
 		dstSorted.push_back(dstPoints[matches[i].trainIdx]);
@@ -71,9 +72,8 @@ int frameProcessor::processFrame(const Mat& input, Mat& output)
 	status |= estimateH(dstSorted, srcSorted);
 
 	if(!status){
-
 		/**
-		 * Draw bounding rectangle around the target
+		 * Draw bounding polygon around the target
 		 */
 		status |= drawTargetBox(output, CV_RGB(0, 0, 255));
 	}
@@ -81,15 +81,15 @@ int frameProcessor::processFrame(const Mat& input, Mat& output)
 	return status;
 }
 
-void frameProcessor::findBRIEFMatches(vector<Feature>& features, int pyramid,
-									  vector<D_MATCH>& matches)
+void frameProcessor::findBRIEFMatches(vector<Feature>& features, int pyramid)
 {
-    int i, j, k;
-    for (i = 0; i < features.size(); i++ ){
+    uint32_t i, j, k;
+    uint32_t mc = matches.size();
+    for (i = 0; i < features.size(); i++){
 
-    	Feature  feature_i	= features[i];
-    	uint32_t minDistIdx = 0;	    	//Minimum distance index
-    	int	 	 minDist    = 0x7FFFFFFF;   //Minimum distance set at maximum value
+    	Feature&  feature_i	= features[i];
+    	uint32_t minDistIdx = 0;	    			//Minimum distance index
+    	uint16_t minDist    = DESCRIPTOR_LENGTH;   	//Minimum distance set at maximum value
     	uint32_t comp[DESCRIPTOR_SIZE];
 
     	// Index table corresponding to the current index
@@ -102,27 +102,26 @@ void frameProcessor::findBRIEFMatches(vector<Feature>& features, int pyramid,
     	for (j = 0; j < dstIdxTbl.size(); j++ ){
 
     		// Get the index of featureTable pointing to the right location
-    		uint32_t tIdx 		= indexTbl[feature_i.index][j];
+    		uint32_t tIdx 		= dstIdxTbl[j];
 			Feature& feature_t 	= featureTable[tIdx];
 
     		for (k = 0; k < DESCRIPTOR_SIZE; k++){
     			comp[k] = (feature_i.descriptor[k] ^ feature_t.descriptor[k]);
     		}
+
     		int dist = descriptorBitCount(comp);
+
     		if (dist < minDist){
     			minDist    = dist;
-    			minDistIdx = j;
+    			minDistIdx = tIdx;
     		}
     	}
 
     	// Push the best match to "matches <vector>"
     	if (minDist <= MIN_HAMMING_DIST){
-    		D_MATCH match;
-    		match.queryIdx = i;
-    		match.trainIdx = minDistIdx;
-    		match.distance = minDist;
-    		matches.push_back(match);
     		Feature& feature_t = featureTable[minDistIdx];
+    		D_MATCH match = {mc, mc++, minDist};
+    		matches.push_back(match);
     		srcPoints.push_back(Point2f(feature_i.x, feature_i.y)*(1<<pyramid));
 			dstPoints.push_back(Point2f(feature_t.x, feature_t.y));
     	}
@@ -241,7 +240,7 @@ int frameProcessor::estimateH(const std::vector<cv::Point2f>& srcPoints,
 		  	  	  	  	  	  const std::vector<cv::Point2f>& dstPoints)
 {
 	unsigned npoints = dstPoints.size();
-	if (npoints < MIN_NUM_MATCHES ){
+	if (npoints < MIN_NUM_MATCHES){
 		return RET_FAILED;
 	}
 
@@ -279,16 +278,20 @@ int frameProcessor::estimateH(const std::vector<cv::Point2f>& srcPoints,
 	 * Currently, NR (Non-Randomness criterion) and Final Refinement (with
 	 * internal, optimized Levenberg-Marquardt method) are enabled.
 	 */
+	Mat tempMask = Mat(npoints, 1, CV_8U);
+	unsigned minInliers = npoints * RANSAC_MIN_INL_RATIO;
+
+	LOG_E("rho 0\n");
 	int numInliers = rhoRefC(p,
 			(const float*)	&srcPoints[0],
 			(const float*)	&dstPoints[0],
-			(char*)			NULL,
+			(char*)			tempMask.data,
 			(unsigned)		npoints,
 			(float)			RANSAC_REPROJ_THRSH,
 			(unsigned)		RANSAC_MAX_ITER,
 			(unsigned)		RANSAC_MAX_ITER,
 			(double)		RANSAC_CONFIDENCE,
-			4U,
+			std::max(4U, (unsigned)minInliers),
 			(double)		RANSAC_NR_BETA,
 			RHO_FLAG_ENABLE_NR | RHO_FLAG_ENABLE_FINAL_REFINEMENT,
 			NULL,
@@ -299,10 +302,11 @@ int frameProcessor::estimateH(const std::vector<cv::Point2f>& srcPoints,
      */
     rhoRefCFini(p);
 
+
     /**
      * Copy the result to homography.
      */
-    if(numInliers > 0){
+    if(numInliers >= std::max(4U, (unsigned)minInliers)){
     	homography = tmpH.clone();
     	return RET_SUCCESS;
     }
