@@ -164,6 +164,7 @@ void VideoOverlayApp::TangoDisconnect() {
 
 void VideoOverlayApp::InitializeGLContent() {
 	video_overlay_drawable_ = new tango_gl::VideoOverlay();
+	_marker = new tango_gl::GoalMarker();
 	yuv_drawable_ = new YUVDrawable();
 
 	// Connect color camera texture. TangoService_connectTextureId expects a valid
@@ -178,10 +179,54 @@ void VideoOverlayApp::InitializeGLContent() {
 				"code: %d",
 				ret);
 	}
+
+	// Some property for the AR marker.
+	const glm::quat kMarkerRotation = glm::quat(0.0f, 0.0f, 1.0f, 0.0f);
+	// The reason we put mark at 0.85f at Y is because the center of the marker
+	// object is not at the tip of the mark.
+	const glm::vec3 kMarkerPosition = glm::vec3(0.0f, 0.3f, -3.0f);
+	const glm::vec3 kMarkerScale = glm::vec3(0.05f, 0.05f, 0.05f);
+	tango_gl::Color kMarkerColor(1.0f, 0.f, 0.f);
+
+	_marker->SetPosition(kMarkerPosition);
+	_marker->SetScale(kMarkerScale);
+	_marker->SetRotation(kMarkerRotation);
+	_marker->SetColor(kMarkerColor);
 }
 
 void VideoOverlayApp::SetViewPort(int width, int height) {
-	glViewport(0, 0, width, height);
+
+	TangoErrorType ret = TangoService_getCameraIntrinsics(
+	      TANGO_CAMERA_COLOR, &color_camera_intrinsics_);
+	if (ret != TANGO_SUCCESS) {
+		LOGE(
+			"VideoOverlayApp: Failed to get camera intrinsics with error"
+			"code: %d",
+			ret);
+	}
+
+	float image_width = static_cast<float>(color_camera_intrinsics_.width);
+	float image_height = static_cast<float>(color_camera_intrinsics_.height);
+	float fx = static_cast<float>(color_camera_intrinsics_.fx);
+	float fy = static_cast<float>(color_camera_intrinsics_.fy);
+	float cx = static_cast<float>(color_camera_intrinsics_.cx);
+	float cy = static_cast<float>(color_camera_intrinsics_.cy);
+
+	float image_plane_ratio = image_height / image_width;
+
+	glm::mat4 projection_mat_ar =
+			tango_gl::Camera::ProjectionMatrixForCameraIntrinsics(
+					image_width, image_height, fx, fy, cx, cy, 0.1,
+					100);
+
+	SetARCameraProjectionMatrix(projection_mat_ar);
+
+	float screen_ratio = static_cast<float>(height) / static_cast<float>(width);
+	if (image_plane_ratio < screen_ratio) {
+		glViewport(0, 0, height / image_plane_ratio, height);
+	} else {
+		glViewport(0, 0, width, width * image_plane_ratio);
+	}
 }
 
 void VideoOverlayApp::Render() {
@@ -209,6 +254,7 @@ void VideoOverlayApp::FreeGLContent() {
 	yuv_temp_buffer_.clear();
 	delete yuv_drawable_;
 	delete video_overlay_drawable_;
+	delete _marker;
 }
 
 void VideoOverlayApp::AllocateTexture(GLuint texture_id, int width,
@@ -278,7 +324,13 @@ void VideoOverlayApp::RenderTextureId() {
 		LOGE("VideoOverlayApp: Failed to update the texture id with error code: "
 			"%d", ret);
 	}
+
+	glDisable(GL_DEPTH_TEST);
 	video_overlay_drawable_->Render(glm::mat4(1.0f), glm::mat4(1.0f));
+	glEnable(GL_DEPTH_TEST);
+	_marker->Render(GetARCameraProjectionMatrix(), glm::mat4(1.0f));
+
+
 }
 
 int VideoOverlayApp::LoadTargetModel(JNIEnv* env, jstring path) {

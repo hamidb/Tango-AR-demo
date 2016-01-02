@@ -37,6 +37,11 @@ LOCAL_SRC_FILES := tango_native.cc \
                    $(TANGO_ROOT)/tango-gl/transform.cpp \
                    $(TANGO_ROOT)/tango-gl/drawable_object.cpp \
                    $(TANGO_ROOT)/tango-gl/shaders.cpp \
+                   $(TANGO_ROOT)/tango-gl/cube.cpp \
+                   $(TANGO_ROOT)/tango-gl/mesh.cpp \
+                   $(TANGO_ROOT)/tango-gl/bounding_box.cpp \
+                   $(TANGO_ROOT)/tango-gl/conversions.cpp \
+                   $(TANGO_ROOT)/tango-gl/goal_marker.cpp \
                    $(TANGO_ROOT)/tango-gl/video_overlay.cpp
 
 LOCAL_C_INCLUDES += $(TANGO_ROOT)/tango-gl/include \

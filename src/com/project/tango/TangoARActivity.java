@@ -27,6 +27,7 @@ import com.project.tango.R;
 import android.app.Activity;
 import android.content.ContextWrapper;
 import android.content.res.AssetManager;
+import android.graphics.PixelFormat;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.view.View;

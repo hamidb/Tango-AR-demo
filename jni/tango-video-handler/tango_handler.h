@@ -25,6 +25,10 @@
 #include <tango_client_api.h>  // NOLINT
 #include <tango-gl/util.h>
 #include <tango-gl/video_overlay.h>
+#include <tango-gl/cube.h>
+#include <tango-gl/goal_marker.h>
+#include <tango-gl/camera.h>
+#include <tango-gl/conversions.h>
 #include "param.h"
 #include "yuv_drawable.h"
 #include "frame_processor.h"
@@ -81,10 +85,21 @@ class VideoOverlayApp {
     current_texture_method_ = static_cast<TextureMethod>(method);
   }
 
+  // Set projection matrix of the AR view (first person view)
+  // @param: projection_matrix, the projection matrix.
+  void SetARCameraProjectionMatrix(const glm::mat4& projection_matrix) {
+    ar_camera_projection_matrix_ = projection_matrix;
+  }
+  glm::mat4 GetARCameraProjectionMatrix() {
+      return ar_camera_projection_matrix_;
+    }
   // Load visual features from the binary file
   int LoadTargetModel(JNIEnv* env, jstring path);
 
  private:
+  // The projection matrix for the first person AR camera.
+  glm::mat4 ar_camera_projection_matrix_;
+
   // Tango configration file, this object is for configuring Tango Service setup
   // before connect to service. For example, we set the flag
   // config_enable_auto_recovery based user's input and then start Tango.
@@ -92,7 +107,10 @@ class VideoOverlayApp {
 
   // video_overlay_ render the camera video feedback onto the screen.
   tango_gl::VideoOverlay* video_overlay_drawable_;
+  tango_gl::Cube* _cube;
   YUVDrawable* yuv_drawable_;
+  tango_gl::GoalMarker* _marker;
+  TangoCameraIntrinsics color_camera_intrinsics_;
 
   TextureMethod current_texture_method_;
 
