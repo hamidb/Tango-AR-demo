@@ -17,15 +17,28 @@ LOCAL_PATH := $(call my-dir)
 TANGO_ROOT:= /hamidb/software/applications/tango-examples-c
 
 include $(CLEAR_VARS)
+LOCAL_MODULE := lib_cudaCode
+LOCAL_SRC_FILES := ../cuda/lib_cudaCode.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := libcudart_static
+LOCAL_LIB_PATH   += $(CUDA_TOOLKIT_ROOT)/targets/armv7-linux-androideabi/lib/
+LOCAL_SRC_FILES  := $(LOCAL_LIB_PATH)/libcudart_static.a 
+include $(PREBUILT_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
 INSTALL_CUDA_LIBRARIES:=on
 OPENCV_INSTALL_MODULES:=on
 CUDA_TOOLKIT_DIR=$(CUDA_TOOLKIT_ROOT)
 NDK_TOOLCHAIN_VERSION = 4.8
 include ../../OpenCV-2.4.8.2-Tegra-sdk/sdk/native/jni/OpenCV-tegra3.mk
 
-LOCAL_MODULE    := myTangoProject
-LOCAL_SHARED_LIBRARIES += tango_client_api
-LOCAL_CFLAGS    := -Werror -std=c++11
+LOCAL_MODULE    		:= myTangoProject
+LOCAL_STATIC_LIBRARIES 	:= lib_cudaCode libcudart_static
+LOCAL_SHARED_LIBRARIES 	+= tango_client_api
+LOCAL_CFLAGS    		:= -Werror -std=c++11 -fno-short-enums
+LOCAL_LDFLAGS 	+= -Os
 LOCAL_SRC_FILES := tango_native.cc \
                    tango_handler.cc \
                    yuv_drawable.cc \
@@ -42,7 +55,10 @@ LOCAL_SRC_FILES := tango_native.cc \
 LOCAL_C_INCLUDES += $(TANGO_ROOT)/tango-gl/include \
                     $(TANGO_ROOT)/third-party/glm \
                     tango-video-handler
-LOCAL_LDLIBS    := -llog -lGLESv2 -L$(SYSROOT)/usr/lib
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/..
+LOCAL_C_INCLUDES += $(CUDA_TOOLKIT_ROOT)/targets/armv7-linux-androideabi/include
+LOCAL_LDLIBS     := -llog -landroid -lGLESv2 -L$(SYSROOT)/usr/lib
+
 include $(BUILD_SHARED_LIBRARY)
 
 $(call import-add-path, $(TANGO_ROOT))

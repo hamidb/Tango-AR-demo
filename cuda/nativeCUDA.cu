@@ -1,66 +1,71 @@
 #include "nativeCUDA.cuh"
-
 #include <cuda_runtime.h>
 #include <cuda.h>
 
 #define DEBUG
-inline
-cudaError_t checkCuda(cudaError_t result) {
-#if defined(DEBUG) || defined(_DEBUG)
-		if (result != cudaSuccess) {
-			LOGI("CUDA Runtime Error: %sn", cudaGetErrorString(result));
-			//assert(result == cudaSuccess);
-		}
+
+inline cudaError_t checkCuda(cudaError_t result) {
+#if defined(DEBUG)
+	if (result != cudaSuccess) {
+		LOGI("CUDA Runtime Error: %sn", cudaGetErrorString(result));
+	}
 #endif
-		return result;
+	return result;
 }
 
-__global__ void addKernel(float* d_a, float* d_b, float* d_ret, int n);
+__global__
+void greyKernel(uchar* d_input, uchar* d_output, int rows, int cols);
 
-void launchAddKernel(float* d_a, float* d_b, float* d_ret, int n) {
-    addKernel<<<(n + TPB-1) / TPB, TPB>>>(d_a, d_b, d_ret, n);
+void launchGreyKernel(uchar* d_input, uchar* d_output, int rows, int cols) {
+	const dim3 blockSize(TPB, TPB, 1); 
+	const dim3 gridSize( (cols + TPB - 1)/TPB, (rows + TPB - 1)/TPB, 1);
+    greyKernel<<<gridSize, blockSize>>>(d_input, d_output, rows, cols);
 }
 
-float* CUDA_addVectors(float* a, float* b, int n) {
-    size_t arr_size = n * sizeof(float);
+void CUDA_greyCvt(uchar* input, uchar** output, int rows, int cols) {
 
-    // Allocate space for sum
-    float *ret, *d_ret;
-    checkCuda( cudaMallocHost((void**) &ret, arr_size) ); // Host
-    checkCuda( cudaMalloc((void**) &d_ret, arr_size) ); // Device
-    // Allocate device space for a and b
-    float *d_a, *d_b;
-    checkCuda (cudaMalloc((void**) &d_a, arr_size) );
-    checkCuda (cudaMalloc((void**) &d_b, arr_size) );
-    // Copy a and b to device memory asynchronously
-    checkCuda( cudaMemcpyAsync(d_a, a, arr_size, cudaMemcpyHostToDevice) );
-    checkCuda( cudaMemcpyAsync(d_b, b, arr_size, cudaMemcpyHostToDevice) );
+    size_t pixel_size = rows * cols;
+
+    // Allocate device space
+    uchar *d_input, *d_output;
+    checkCuda (cudaMalloc((void**) &d_input, 3 * pixel_size) );
+    checkCuda (cudaMalloc((void**) &d_output, pixel_size) );
+	checkCuda (cudaMemset((void*) d_output, 0, pixel_size));
+
+    // Copy input image to device memory asynchronously
+    checkCuda( cudaMemcpyAsync(d_input, input, 3 * pixel_size, cudaMemcpyHostToDevice) );
+    checkCuda( cudaMemcpyAsync(d_output, *output, pixel_size, cudaMemcpyHostToDevice) );
+
     // Wait for copies to complete
     cudaDeviceSynchronize();
 
     // Launch device kernel
-    launchAddKernel(d_a, d_b, d_ret, n);
+    launchGreyKernel(d_input, d_output, rows, cols);
+
     // Wait for kernel to finish
     cudaDeviceSynchronize();
+
     // Check for any errors created by kernel
     checkCuda(cudaGetLastError());
 
     // Copy back sum array
-    checkCuda( cudaMemcpy(ret, d_ret, arr_size, cudaMemcpyDeviceToHost) );
+    checkCuda( cudaMemcpy(*output, d_output, pixel_size, cudaMemcpyDeviceToHost) );
 
     // Free allocated memory
-    cudaFree(d_ret);
-    cudaFree(d_a);
-    cudaFree(d_b);
-
-    return ret;
+    cudaFree(d_input);
+    cudaFree(d_output);
 }
 
 // GPU kernel
-__global__ void addKernel(float* d_a, float* d_b, float* d_ret, int n) {
-    int index = threadIdx.x + blockIdx.x * blockDim.x;
-    if (index >= n) {
+__global__ 
+void greyKernel(uchar* d_input, uchar* d_output, int rows, int cols){
+    int index_x = threadIdx.x + blockIdx.x * blockDim.x;
+	int index_y = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (index_x >= cols || index_y >= rows) {
         return;
     }
-    d_ret[index] = d_a[index] + d_b[index];
+
+	uchar* rgb = &d_input[3*(index_x + index_y * cols)];
+    d_output[index_x + index_y*cols] = rgb[0] * .299f + rgb[1] * .587f + rgb[2] * .114f;
 }

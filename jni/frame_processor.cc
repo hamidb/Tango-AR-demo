@@ -5,8 +5,12 @@
 
 #include "tango-video-handler/param.h"
 #include "tango-video-handler/frame_processor.h"
+#include "cuda/nativeCUDA.cuh"
 
 using namespace cv;
+
+#define HAVE_CUDA
+//#undef HAVE_CUDA
 
 frameProcessor::frameProcessor()
 {
@@ -21,8 +25,11 @@ int frameProcessor::processFrame(const Mat& input, Mat& output)
 	output = input.clone();
 	int status = RET_SUCCESS;
 
-	Mat gray;
-	cvtColor(input, gray, CV_RGB2GRAY);
+	int width = input.rows, height = input.cols;
+	Mat gray(height, width, CV_8UC1);
+
+	grayColor(input, gray);
+
 	//GaussianBlur(gray, gray, Size(3,3), 1, 1);
 
 	vector<Mat> scales;
@@ -136,6 +143,20 @@ int frameProcessor::configProcessor(void)
 int frameProcessor::releaseProcessor(void)
 {
 	return RET_SUCCESS;
+}
+
+void frameProcessor::grayColor(const Mat& input, Mat& gray)
+{
+#ifdef HAVE_CUDA
+	if(!gray.ptr<uchar>(0)){
+		LOG_E("Error: gray image must be allocated for CUDA grayscale conversion!");
+		return;
+	}
+	uchar *gray_ptr = gray.ptr<uchar>(0);
+	CUDA_greyCvt(input.data, &gray_ptr, input.rows, input.cols);
+#else
+	cvtColor(input, gray, CV_RGB2GRAY);
+#endif
 }
 
 void frameProcessor::extractFeatures(const Mat& input,

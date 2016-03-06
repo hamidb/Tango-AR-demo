@@ -14,13 +14,14 @@
 #include <vector>
 #include "rhorefc.h"
 
+using namespace cv;
+
 #define DESCRIPTOR_LENGTH 	256		// Length of BRIEF descriptor in bits
 #define DESCRIPTOR_SIZE		8		// Size of the descriptor (256/32 = 8)
 #define MAX_TOTAL_MATCH		1000	// Maximum number of required matches
 #define FAST_THRSH			30		// FAST9 threshold (smaller -> more features)
 #define HALF_PATCH_WIDTH	15		// Half of 30 patch used in BRIEF
 #define MIN_HAMMING_DIST	46		// Hamming threshold used for matching
-using namespace cv;
 
 /**
 * Struct similar to OpenCV DMatch
@@ -83,6 +84,9 @@ public:
 	int loadModelFromFile(const std::string&);
 
 private:
+	// Convert RGB image to grayscale
+	void grayColor(const Mat& input, Mat& gray);
+
 	// Extract FAST9 features and BRIEF descriptor
 	void extractFeatures(const cv::Mat& gray, std::vector<Feature>& features) const;
 

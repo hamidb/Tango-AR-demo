@@ -5,9 +5,9 @@
 #endif
 #endif
 
-#define TPB 512
+#define TPB	16 
+typedef unsigned char uchar;
 
+void launchGreyKernel(uchar* d_input, uchar* d_output, int rows, int cols);
 
-void launchAddKernel(float* d_a, float* d_b, float* d_ret);
-
-float* CUDA_addVectors(float* a, float* b, int n);
+void CUDA_greyCvt(uchar* input, uchar** output, int rows, int cols);
